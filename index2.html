@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo Palavras</title>
+    <style>
+        body {
+            user-select: none;
+            -webkit-user-select: none; /* Para navegadores WebKit */
+            -moz-user-select: none;    /* Para navegadores Firefox */
+            -ms-user-select: none;     /* Para Internet Explorer/Edge */
+        }
+        .container {
+            display: flex;
+            align-items: flex-start; /* Garante que ambos os conteúdos comecem no topo */
+            gap: 20px; /* Espaçamento entre o grid e o texto */
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 50px);
+            gap: 5px;
+        }
+
+        .grid div {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #000;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .text {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start; /* Mantém o texto alinhado ao topo */
+            text-align: justify;
+            font-size: 14px;
+        }
+
+        .selected {
+            background-color: #D8BFD8; /* Roxo claro */
+        }
+
+        .highlight {
+            background-color: #E6E6FA; /* Lavanda */
+        }
+
+        .button {
+            margin-top:10px;
+            padding: 10px 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: white;
+            width: 65px;
+            height: 65px;
+        }
+    
+        .check {
+            background-color: #D8BFD8;
+        }
+    
+        .clear {
+            background-color: #E6E6FA;
+        }
+    
+        .nextBlock {
+           background-color: #FAE6E6
+        }
+        
+        .next {
+           background-color: #E6FAE6;
+        }
+    
+        .solutions-title {
+            background-color: #D8BFD8;
+            color: white;
+            width: 100vh;
+            height: 32px;
+            vertical-align: middle;
+            border: 1px solid black;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .solutions-words {
+            background-color: white;
+            color: black;
+            width: 100vh;
+            max-height: 0;
+            overflow: hidden;
+            border: 1px solid black;
+            transition: max-height 0.5s ease-out;
+            max-width: 100%;
+            align-items: center;
+        }
+    
+        .expanded {
+            max-height: 200px;
+        }
+
+        .word {
+            border: 1px solid black;
+            width: 80px;
+            height: auto;
+            margin: 8px;
+            text-align: center;
+            display: inline-block;
+        }
+        .word::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: green;
+            display: none; /* Só será exibido na palavra correspondente */
+            transform: translateY(-50%); /* Centraliza a linha verticalmente */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="grid" id="grid">
+        </div>
+        <div class="text">
+            <p>O <b>objetivo</b> é formar palavras conectando as letras do diagrama em qualquer direção. As letras devem ser ligadas de forma contínua, sem cruzar caminhos, sem pular letras, e sem repetir a mesma letra na palavra, a menos que ela apareça mais de uma vez no diagrama. Somente palavras com quatro letras ou mais são válidas.<br>A solução contém 30 palavras, mas se você conseguir encontrar mais, parabéns!<br>Isso demonstra um excelente conhecimento.</p>
+            <div class="container">
+                <button class="button clear"      id="clearButton">X</button>
+                <button class="button check"      id="checkButton">✓</button>
+                <button class="button nextBlock"  id="nextButton">►</button>
+            </div>
+        </div>
+    </div>
+    <br>
+    <div class="container">
+        <div class="solutions-title">
+            <div class="tittle">▲ PALAVRAS</div>
+        </div>
+    </div>
+    <div class="container">
+        <div class="solutions-words">
+        </div>
+    </div>
+    <script>
+          // Definição do objeto 'fases'
+        const fases = {
+            fase1: {
+                gridData: [
+                    ['A', 'G', 'B'],
+                    ['C', 'I', 'E'],
+                    ['U', 'R', 'D'],
+                    ['G', 'N', 'A'],
+                    ['A', 'C', 'E'],
+                    ['G', 'I', 'T']
+                ],
+                solutions: ["ACARI", "ACENA", "ACIDA", "ANGRA", "ANGU", "ANUIR", "BEIRA", "BIDE", "BIGA", "CAIDA", "CARGA", "CARIE", "CEIA", "CIBERNETICA", "CIDRA", "CIGANA", "CUIDAR", "DICA", "ETICA", "GIRA", "GREI", "GURI", "NADIR", "NUCA", "RUGA", "TEIA", "TENDA", "TENDER", "TICAR", "URNA"]
+            },
+            // Outras fases podem ser adicionadas aqui no futuro
+        };
+
+        // Selecionando os dados da fase 1
+        const faseAtual = fases.fase1;
+    
+        // Carregar o gridData da fase 1
+        const gridData = faseAtual.gridData;
+
+        // Carregar as soluções da fase 1
+        const solutions = faseAtual.solutions;
+
+        const gridContainer = document.getElementById('grid');
+        let firstSelection  = true;
+        let selectedLetters = [];
+
+        // Criar o grid com base nos dados da fase 1
+        gridData.forEach((row, rowIndex) => {
+            row.forEach((cell, cellIndex) => {
+                const cellDiv = document.createElement('div');
+                cellDiv.textContent = cell;
+                cellDiv.addEventListener('click', () => {
+                    if (cellDiv.classList.contains('selected')) {
+                        return; // Não faz nada se a célula já estiver selecionada
+                    }
+                    if (firstSelection || cellDiv.classList.contains('highlight')) {
+                        clearHighlights();
+                        cellDiv.classList.toggle('selected');
+                        if (cellDiv.classList.contains('selected')) {
+                            selectedLetters.push(cellDiv.textContent);
+                            highlightAdjacentCells(rowIndex, cellIndex);
+                        }
+                        firstSelection = false;
+                    }
+                });
+                gridContainer.appendChild(cellDiv);
+            });
+        });
+
+        // Exibir as palavras possíveis para a fase
+        const containerWords = document.querySelector('.solutions-words');
+        solutions.forEach(word => {
+            const wordDiv = document.createElement('div');
+            wordDiv.className = 'word';
+            wordDiv.textContent = word;
+            containerWords.appendChild(wordDiv);
+        });
+
+        // Ajustar tamanho da fonte se necessário
+        const containers = document.querySelectorAll('.word');
+        containers.forEach(container => {
+            if (container.scrollWidth > container.clientWidth) {
+                container.style.fontSize = '12px'; // Ajuste o valor conforme necessário
+            }
+        });
+
+        // Funções para limpar e destacar as células
+        function clearHighlights() {
+            document.querySelectorAll('.highlight').forEach(cell => {
+                cell.classList.remove('highlight');
+            });
+        }
+
+        function clearSelections() {
+            document.querySelectorAll('.selected').forEach(cell => {
+                cell.classList.remove('selected');
+            });
+            selectedLetters = [];
+            firstSelection = true;
+        }
+
+        function highlightAdjacentCells(row, col) {
+            const directions = [
+                [-1, -1], [-1, 0], [-1, 1],
+                [0, -1],         [0, 1],
+                [1, -1], [1, 0], [1, 1]
+            ];
+    
+            directions.forEach(direction => {
+                const newRow = row + direction[0];
+                const newCol = col + direction[1];
+                if (newRow >= 0 && newRow < gridData.length && newCol >= 0 && newCol < gridData[0].length) {
+                    const adjacentCell = gridContainer.children[newRow * gridData[0].length + newCol];
+                    if (!adjacentCell.classList.contains('selected')) {
+                        adjacentCell.classList.add('highlight');
+                    }
+                }
+            });
+        }
+
+        function getSelectedLetters() {
+            return selectedLetters.join('');
+        }
+
+        // Verificar se a palavra selecionada está correta
+        document.getElementById('checkButton').addEventListener('click', () => {
+            const selectedWord = getSelectedLetters();
+            if (solutions.includes(selectedWord)) {
+                const wordToFind = selectedWord;  
+                const divs = document.querySelectorAll('.word');  
+                let allGreen = true;  
+                divs.forEach(div => {
+                    if (div.textContent.trim() === wordToFind) {
+                        div.style.color = 'green';
+                    }
+                    const style = window.getComputedStyle(div);  
+                    if (style.color !== 'rgb(0, 128, 0)') {  
+                        allGreen = false;  
+                    }
+                });
+                if (allGreen) {
+                    alert("Parabéns! Você encontrou todas as palavras e pode ir para a próxima fase quando desejar.");
+                    const nextButton = document.getElementById("nextButton");
+                    nextButton.classList.remove("nextBlock");
+                    nextButton.classList.add("next");
+                } else {
+                    console.log("Nem todas as palavras estão verdes.");
+                }
+            } else {
+                //alert(`A palavra ${selectedWord} não está na lista de soluções.`);
+            }
+            clearSelections();
+            clearHighlights();
+        });
+
+        // Limpar seleções e destaques
+        document.getElementById('clearButton').addEventListener('click', () => {
+            clearSelections();
+            clearHighlights();
+        });
+    
+        // Próxima fase
+        document.getElementById('nextButton').addEventListener('click', () => {
+            const divs = document.querySelectorAll('.word');  
+            let allGreen = true;  
+            divs.forEach(div => {
+                const style = window.getComputedStyle(div);  
+                if (style.color !== 'rgb(0, 128, 0)') {  
+                    allGreen = false;  
+                }
+            });
+            if (allGreen) {
+                alert("Indo para a próxima fase.");
+            } else {
+                console.log("Você não encontrou todas as palavras da solução ainda.");
+            }
+        });
+
+        // Mostrar ou ocultar a lista de soluções
+        document.querySelector('.solutions-title').addEventListener('click', function() {
+            const wordsDiv = document.querySelector('.solutions-words');
+            if (wordsDiv.style.maxHeight === '0px' || wordsDiv.style.maxHeight === '') {
+                wordsDiv.style.maxHeight = wordsDiv.scrollHeight + 'px';
+                document.querySelector('.title').innerHTML = "▼ PALAVRAS";
+            } else {
+                wordsDiv.style.maxHeight = '0';
+                document.querySelector('.title').innerHTML = "▲ PALAVRAS";
+            }
+        });
+    </script>
+</body>
+</html>
